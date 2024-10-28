@@ -4,7 +4,7 @@ import streamlit as st
 import os
 import tempfile
 from PIL import Image
-from main import generate_images  # Ensure main.py is in the same directory
+from frontend import generate_images  # Ensure main.py is in the same directory
 
 st.set_page_config(layout="wide")  # Set layout to wide for a better UI experience
 
