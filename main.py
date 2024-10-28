@@ -1,6 +1,9 @@
 # main.py
+
 import os
 import torch
+import random
+import numpy as np
 from ddps.pipe import StableDiffusionInverse, EulerAncestralDSG
 from ddps.dataset import ImageDataset
 from ddps.op import SuperResolutionOperator, GaussialBlurOperator, MotionBlurOperator
@@ -11,24 +14,27 @@ from torchvision.utils import save_image
 torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.allow_tf32 = True
 
-def run_pipeline(input_image_path, output_folder, model="stabilityai/stable-diffusion-2-base", scale=4.8, algo="dps", 
-                 operator="srx8", nstep=500, fdm_c1=100, fdm_c2=250, fdm_k=2, psld_gamma=0.1):
-    
+def fix_seed(seed):
+    torch.manual_seed(seed=seed)
+    torch.cuda.manual_seed_all(seed=seed)
+    np.random.seed(seed=seed)
+    random.seed(seed)
+
+def generate_images(model, data_path, out_path, scale, algo, operator, nstep, fdm_c1, fdm_c2, fdm_k, psld_gamma, prompt=""):
     DTYPE = torch.float32
 
-    # Create output subdirectories
     out_dirs = ["source", "low_res", "recon", "recon_low_res"]
-    out_dirs = [os.path.join(output_folder, o) for o in out_dirs]
+    out_dirs = [os.path.join(out_path, o) for o in out_dirs]
     for out_dir in out_dirs:
         os.makedirs(out_dir, exist_ok=True)
 
     test_transforms = transforms.Compose(
         [transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
     )
-    dataset = ImageDataset(root=input_image_path, transform=test_transforms, return_path=True)
+
+    dataset = ImageDataset(root=data_path, transform=test_transforms, return_path=True)
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False)
 
-    # Select operator
     if operator == "srx8":
         f = SuperResolutionOperator([1, 3, 512, 512], 8)
     elif operator == "gdb":
@@ -40,19 +46,21 @@ def run_pipeline(input_image_path, output_folder, model="stabilityai/stable-diff
 
     f = f.to(dtype=DTYPE, device="cuda")
 
-    # Initialize model and scheduler
+    model_id = model
     if algo == "dsg":
-        scheduler = EulerAncestralDSG.from_pretrained(model, subfolder="scheduler")
+        scheduler = EulerAncestralDSG.from_pretrained(model_id, subfolder="scheduler")
     else:
-        scheduler = EulerAncestralDiscreteScheduler.from_pretrained(model, subfolder="scheduler")
-    
-    pipe = StableDiffusionInverse.from_pretrained(model, scheduler=scheduler, torch_dtype=DTYPE)
+        scheduler = EulerAncestralDiscreteScheduler.from_pretrained(
+            model_id, subfolder="scheduler"
+        )
+    pipe = StableDiffusionInverse.from_pretrained(
+        model_id, scheduler=scheduler, torch_dtype=DTYPE
+    )
     pipe = pipe.to("cuda")
 
-    # Process each image in the dataloader
     for i, (x, x_path) in enumerate(dataloader):
-        x_name = x_path[0].split("/")[-1]
-        x_name = x_name[:-4] + ".png"
+        fix_seed(i)
+        x_name = os.path.basename(x_path[0]).replace(".jpg", ".png").replace(".jpeg", ".png")
         x = x.to(dtype=DTYPE, device="cuda")
         y = f(x, reset=True)
         image, _ = pipe(
@@ -60,6 +68,7 @@ def run_pipeline(input_image_path, output_folder, model="stabilityai/stable-diff
             y=y,
             algo=algo,
             scale=scale,
+            prompt=prompt,
             height=512,
             width=512,
             num_inference_steps=nstep,
@@ -74,9 +83,9 @@ def run_pipeline(input_image_path, output_folder, model="stabilityai/stable-diff
         x_hat = image * 2.0 - 1.0
         y_hat = f(x_hat)
 
-        # Save output images
         out_tensors = [x, y, x_hat, y_hat]
-        for j, out_tensor in enumerate(out_tensors):
-            save_image(out_tensor, os.path.join(out_dirs[j], x_name), normalize=True, value_range=(-1, 1))
 
-    return out_dirs
+        for j, tensor in enumerate(out_tensors):
+            save_image(tensor, os.path.join(out_dirs[j], x_name), normalize=True, value_range=(-1, 1))
+
+    print("Image generation complete!")
