@@ -22,6 +22,8 @@ def fix_seed(seed):
 
 def generate_images(model, data_path, out_path, scale, algo, operator, nstep, fdm_c1, fdm_c2, fdm_k, psld_gamma, prompt=""):
     DTYPE = torch.float32
+    torch.backends.cuda.matmul.allow_tf32 = True
+    torch.backends.cudnn.allow_tf32 = True
 
     out_dirs = ["source", "low_res", "recon", "recon_low_res"]
     out_dirs = [os.path.join(out_path, o) for o in out_dirs]
