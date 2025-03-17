@@ -93,3 +93,42 @@ class MotionBlurOperator(nn.Module):
         y = torch.clip(y, 0, 1)
         y = to_pil_image(y, "RGB")
         return y
+
+
+class InpaintingOperator(nn.Module):
+    def __init__(self, fill_value=0.0):
+        super(InpaintingOperator, self).__init__()
+        
+        self.fill_value = fill_value
+        self.mask = self.create_random_mask()
+    
+    def create_random_mask(self):
+        """Creates a mask with a randomly chosen box covering 1/4 of the image."""
+        h = 512
+        w = 512
+        image_shape = (1, 3, h, w)
+        mask = torch.ones(image_shape, dtype=torch.float32)
+        
+        box_h, box_w = h // 2, w // 2
+        y_start = torch.randint(0, h - box_h + 1, (1,)).item()
+        x_start = torch.randint(0, w - box_w + 1, (1,)).item()
+        
+        mask[:, :, y_start:y_start + box_h, x_start:x_start + box_w] = 0
+        return mask
+
+    def forward(self, data, **kwargs):
+        # Apply inpainting by replacing masked regions with the fill_value
+        inpainted_data = data * self.mask + (1 - self.mask) * self.fill_value
+        return inpainted_data
+    
+    def get_mask(self):
+        return self.mask
+
+    def y_channel(self):
+        return 3
+
+    def to_pil(self, y):
+        y = (y[0] + 1.0) / 2.0
+        y = torch.clip(y, 0, 1)
+        y = to_pil_image(y, "RGB")
+        return y
