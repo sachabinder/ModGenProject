@@ -226,8 +226,8 @@ class StableDiffusionInverse(StableDiffusionPipeline):
                         noise_pred, t, latents, return_dict=True, **extra_step_kwargs
                     )
                     latents_next, pred_z0 = (
-                        scheduler_out.prev_sample,
-                        scheduler_out.pred_original_sample,
+                        scheduler_out.prev_sample.to(torch.float16),
+                        scheduler_out.pred_original_sample.to(torch.float16),
                     )
 
                     pred_x0 = self.vae.decode(

@@ -50,7 +50,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    DTYPE = torch.float32
+    DTYPE = torch.float16
 
     out_dirs = ["source", "low_res", "recon", "recon_low_res"]
     out_dirs = [os.path.join(args.out, o) for o in out_dirs]
@@ -77,10 +77,10 @@ if __name__ == "__main__":
 
     model_id = args.model
     if args.algo == "dsg":
-        scheduler = EulerAncestralDSG.from_pretrained(model_id, subfolder="scheduler")
+        scheduler = EulerAncestralDSG.from_pretrained(model_id, subfolder="scheduler", torch_dtype=DTYPE)
     else:
         scheduler = EulerAncestralDiscreteScheduler.from_pretrained(
-            model_id, subfolder="scheduler"
+            model_id, subfolder="scheduler", torch_dtype=DTYPE
         )
     pipe = StableDiffusionInverse.from_pretrained(
         model_id, scheduler=scheduler, torch_dtype=DTYPE
