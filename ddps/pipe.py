@@ -635,6 +635,121 @@ class StableDiffusionInverse(StableDiffusionPipeline):
 
         return latents
 
+    def run_gml_psld(
+        self,
+        f,
+        y,
+        scale,
+        latents,
+        prompt_embeds,
+        negative_prompt_embeds,
+        timesteps,
+        timestep_cond,
+        num_warmup_steps,
+        num_inference_steps,
+        generator,
+        callback,
+        callback_steps,
+        callback_on_step_end,
+        callback_on_step_end_tensor_inputs,
+        added_cond_kwargs,
+        extra_step_kwargs,
+        **kwargs,
+    ):
+        with self.progress_bar(total=num_inference_steps) as progress_bar:
+            for i, t in enumerate(timesteps):
+                if self.interrupt:
+                    continue
+                with torch.enable_grad():
+                    latents.requires_grad = True
+                    # expand the latents if we are doing classifier free guidance
+                    latent_model_input = (
+                        torch.cat([latents] * 2)
+                        if self.do_classifier_free_guidance
+                        else latents
+                    )
+                    latent_model_input = self.scheduler.scale_model_input(
+                        latent_model_input, t
+                    )
+
+                    # predict the noise residual
+                    noise_pred = self.unet(
+                        latent_model_input,
+                        t,
+                        encoder_hidden_states=prompt_embeds,
+                        timestep_cond=timestep_cond,
+                        cross_attention_kwargs=self.cross_attention_kwargs,
+                        added_cond_kwargs=added_cond_kwargs,
+                        return_dict=False,
+                    )[0]
+
+                    # perform guidance
+                    if self.do_classifier_free_guidance:
+                        noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
+                        noise_pred = noise_pred_uncond + self.guidance_scale * (
+                            noise_pred_text - noise_pred_uncond
+                        )
+
+                    if self.do_classifier_free_guidance and self.guidance_rescale > 0.0:
+                        # Based on 3.4. in https://arxiv.org/pdf/2305.08891.pdf
+                        noise_pred = rescale_noise_cfg(
+                            noise_pred,
+                            noise_pred_text,
+                            guidance_rescale=self.guidance_rescale,
+                        )
+
+                    # compute the previous noisy sample x_t -> x_t-1
+                    scheduler_out = self.scheduler.step(
+                        noise_pred, t, latents, return_dict=True, **extra_step_kwargs
+                    )
+                    latents_next, pred_z0 = (
+                        scheduler_out.prev_sample.to(torch.float16),
+                        scheduler_out.pred_original_sample.to(torch.float16),
+                    )
+                    pred_x0 = self.vae.decode(
+                        pred_z0 / self.vae.config.scaling_factor,
+                        return_dict=False,
+                        generator=generator,
+                    )[0]
+
+                    encoded_z_0 = (
+                        self.vae.encode(pred_x0).latent_dist.sample()
+                        * self.vae.config.scaling_factor
+                    )
+                    inpaint_error = torch.linalg.norm(encoded_z_0 - pred_z0)
+
+                    dist = torch.linalg.norm(f(pred_x0) - y)
+                    norm = dist + kwargs["psld_gamma"] * inpaint_error
+                    norm_grad = torch.autograd.grad(outputs=norm, inputs=latents)[0]
+
+                    progress_bar.set_postfix({"distance": dist.item()}, refresh=False)
+
+                latents_next = latents_next - norm_grad * scale
+                latents = latents_next.detach()
+
+                if callback_on_step_end is not None:
+                    callback_kwargs = {}
+                    for k in callback_on_step_end_tensor_inputs:
+                        callback_kwargs[k] = locals()[k]
+                    callback_outputs = callback_on_step_end(self, i, t, callback_kwargs)
+
+                    latents = callback_outputs.pop("latents", latents)
+                    prompt_embeds = callback_outputs.pop("prompt_embeds", prompt_embeds)
+                    negative_prompt_embeds = callback_outputs.pop(
+                        "negative_prompt_embeds", negative_prompt_embeds
+                    )
+
+                # call the callback, if provided
+                if i == len(timesteps) - 1 or (
+                    (i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0
+                ):
+                    progress_bar.update()
+                    if callback is not None and i % callback_steps == 0:
+                        step_idx = i // getattr(self.scheduler, "order", 1)
+                        callback(step_idx, t, latents)
+
+        return latents
+
     @torch.no_grad()
     def __call__(
         self,
@@ -809,6 +924,8 @@ class StableDiffusionInverse(StableDiffusionPipeline):
             latent_generation_function = self.run_dsg
         elif algo == "psld":
             latent_generation_function = self.run_psld
+        elif algo == "gml_psld":
+            latent_generation_function = self.run_gml_psld
         else:
             raise NotImplementedError
 

@@ -44,6 +44,8 @@ if __name__ == "__main__":
     parser.add_argument("--fdm_c1", type=int, default=100, help="c1 of FreeDOM")
     parser.add_argument("--fdm_c2", type=int, default=250, help="c2 of FreeDOM")
     parser.add_argument("--fdm_k", type=int, default=2, help="k of FreeDOM")
+
+    # Inpainting specific parameters
     parser.add_argument("--impating_mask_color", type=str, default='gray')
     parser.add_argument("--rand_impating_proportion", type=float, default=0.25)
 
