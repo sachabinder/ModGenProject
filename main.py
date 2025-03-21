@@ -83,7 +83,7 @@ if __name__ == "__main__":
             model_id, subfolder="scheduler", torch_dtype=DTYPE
         )
     pipe = StableDiffusionInverse.from_pretrained(
-        model_id, scheduler=scheduler, torch_dtype=DTYPE
+        model_id, scheduler=scheduler, torch_dtype=DTYPE,
     )
     pipe = pipe.to("cuda")
 
