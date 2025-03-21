@@ -68,6 +68,8 @@ if __name__ == "__main__":
     dataset = ImageDataset(root=args.data, transform=test_transforms, return_path=True)
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False)
 
+    print("Dataset is of size", len(dataset))
+
     if args.impating_mask_color == 'gray':
         fill_value = (0.0, 0.0, 0.0)
     elif args.impating_mask_color == 'red':
