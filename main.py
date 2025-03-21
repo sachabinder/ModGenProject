@@ -3,7 +3,7 @@ import torch
 import random
 from ddps.pipe import StableDiffusionInverse, EulerAncestralDSG
 from ddps.dataset import ImageDataset
-from ddps.op import SuperResolutionOperator, GaussialBlurOperator, MotionBlurOperator
+from ddps.op import SuperResolutionOperator, GaussialBlurOperator, MotionBlurOperator, InpaintingOperator
 from diffusers.schedulers import EulerAncestralDiscreteScheduler
 from torchvision import transforms
 import numpy as np
@@ -44,6 +44,7 @@ if __name__ == "__main__":
     parser.add_argument("--fdm_c1", type=int, default=100, help="c1 of FreeDOM")
     parser.add_argument("--fdm_c2", type=int, default=250, help="c2 of FreeDOM")
     parser.add_argument("--fdm_k", type=int, default=2, help="k of FreeDOM")
+    parser.add_argument("--impating_mask_color", type=str, default='gray')
 
     # PSLD specific parameters
     parser.add_argument("--psld_gamma", type=float, default=0.1, help="gamma of PSLD")
@@ -70,6 +71,21 @@ if __name__ == "__main__":
         f = GaussialBlurOperator()
     elif args.operator == "mdb":
         f = MotionBlurOperator()
+    elif args.operator == "bip":
+        if args.impating_mask_color == 'gray':
+            fill_value = (0.0, 0.0, 0.0)
+        elif args.impating_mask_color == 'red':
+            fill_value = (1.0, -1.0, -1.0)
+        elif args.impating_mask_color == 'blue':
+            fill_value = (-1.0, 1.0, -1.0)
+        elif args.impating_mask_color == 'green':
+            fill_value = (-1.0, -1.0, 1.0)
+        elif args.impating_mask_color == 'white':
+            fill_value = (1.0, 1.0, 1.0)
+        elif args.impating_mask_color == 'black':
+            fill_value = (-1.0, -1.0, -1.0)
+
+        f = InpaintingOperator(device="cuda")
     else:
         raise NotImplementedError
 

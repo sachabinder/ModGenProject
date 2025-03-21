@@ -96,11 +96,12 @@ class MotionBlurOperator(nn.Module):
 
 
 class InpaintingOperator(nn.Module):
-    def __init__(self, fill_value=0.0):
+    def __init__(self, fill_value=(1.0, 0.0, 0.0), device='cuda'):
         super(InpaintingOperator, self).__init__()
         
-        self.fill_value = fill_value
+        self.fill_value = torch.tensor(fill_value).view(1, 3, 1, 1)
         self.mask = self.create_random_mask()
+        self.device = device
     
     def create_random_mask(self):
         """Creates a mask with a randomly chosen box covering 1/4 of the image."""
@@ -110,19 +111,26 @@ class InpaintingOperator(nn.Module):
         mask = torch.ones(image_shape, dtype=torch.float32)
         
         box_h, box_w = h // 2, w // 2
-        y_start = torch.randint(0, h - box_h + 1, (1,)).item()
-        x_start = torch.randint(0, w - box_w + 1, (1,)).item()
+        y_start = 256
+        x_start = 123
         
         mask[:, :, y_start:y_start + box_h, x_start:x_start + box_w] = 0
         return mask
 
     def forward(self, data, **kwargs):
         # Apply inpainting by replacing masked regions with the fill_value
+        self.mask = self.mask.to(self.device)
+        data = data.to(self.device)
+        self.fill_value = self.fill_value.to(self.device)
         inpainted_data = data * self.mask + (1 - self.mask) * self.fill_value
-        return inpainted_data
+
+        return inpainted_data.to(torch.float16)
     
     def get_mask(self):
         return self.mask
+
+    def transpose(self, data, **kwargs):
+        return data
 
     def y_channel(self):
         return 3
