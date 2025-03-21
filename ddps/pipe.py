@@ -583,8 +583,8 @@ class StableDiffusionInverse(StableDiffusionPipeline):
                         noise_pred, t, latents, return_dict=True, **extra_step_kwargs
                     )
                     latents_next, pred_z0 = (
-                        scheduler_out.prev_sample,
-                        scheduler_out.pred_original_sample,
+                        scheduler_out.prev_sample.to(torch.float16),
+                        scheduler_out.pred_original_sample.to(torch.float16),
                     )
                     pred_x0 = self.vae.decode(
                         pred_z0 / self.vae.config.scaling_factor,
@@ -592,6 +592,7 @@ class StableDiffusionInverse(StableDiffusionPipeline):
                         generator=generator,
                     )[0]
 
+                    # TODO : Check here for the gluing term
                     ortho_project = pred_x0 - f.transpose(f(pred_x0))
                     parallel_project = f.transpose(y)
                     inpainted_image = parallel_project + ortho_project
