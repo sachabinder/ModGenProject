@@ -111,7 +111,7 @@ class InpaintingOperator(nn.Module):
         mask = torch.ones(image_shape, dtype=torch.float32)
         
         box_h, box_w = h // 2, w // 2
-        y_start = 256
+        y_start = 123
         x_start = 123
         
         mask[:, :, y_start:y_start + box_h, x_start:x_start + box_w] = 0
@@ -126,6 +126,57 @@ class InpaintingOperator(nn.Module):
 
         return inpainted_data.to(torch.float16)
     
+    def get_mask(self):
+        return self.mask
+
+    def transpose(self, data, **kwargs):
+        return data
+
+    def y_channel(self):
+        return 3
+
+    def to_pil(self, y):
+        y = (y[0] + 1.0) / 2.0
+        y = torch.clip(y, 0, 1)
+        y = to_pil_image(y, "RGB")
+        return y
+
+
+class RandomInpaintingOperator(nn.Module):
+    def __init__(self, fill_value=(1.0, 0.0, 0.0), proportion=0.25, device='cuda'):
+        super(RandomInpaintingOperator, self).__init__()
+        
+        self.fill_value = torch.tensor(fill_value).view(1, 3, 1, 1)
+        self.proportion = proportion  # Proportion of pixels to mask (e.g., 0.25 for 25%)
+        self.device = device
+    
+    def create_random_mask(self, image_shape):
+        """Creates a random mask by randomly selecting a proportion of pixels."""
+        _, _, h, w = image_shape
+        mask = torch.ones(image_shape, dtype=torch.float32)
+
+        # Number of pixels to mask
+        num_pixels = int(h * w * self.proportion)
+
+        # Generate random coordinates
+        y_coords = torch.randint(0, h, (num_pixels,))
+        x_coords = torch.randint(0, w, (num_pixels,))
+
+        # Apply mask
+        mask[:, :, y_coords, x_coords] = 0
+        return mask
+
+    def forward(self, data, **kwargs):
+        # Generate a random mask based on the input image shape
+        image_shape = data.shape
+        self.mask = self.create_random_mask(image_shape).to(self.device)
+        data = data.to(self.device)
+        self.fill_value = self.fill_value.to(self.device)
+        
+        # Apply inpainting by replacing masked regions with the fill value
+        inpainted_data = data * self.mask + (1 - self.mask) * self.fill_value
+        return inpainted_data.to(torch.float16)
+
     def get_mask(self):
         return self.mask
 

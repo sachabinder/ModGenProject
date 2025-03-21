@@ -3,7 +3,7 @@ import torch
 import random
 from ddps.pipe import StableDiffusionInverse, EulerAncestralDSG
 from ddps.dataset import ImageDataset
-from ddps.op import SuperResolutionOperator, GaussialBlurOperator, MotionBlurOperator, InpaintingOperator
+from ddps.op import SuperResolutionOperator, GaussialBlurOperator, MotionBlurOperator, InpaintingOperator, RandomInpaintingOperator
 from diffusers.schedulers import EulerAncestralDiscreteScheduler
 from torchvision import transforms
 import numpy as np
@@ -45,6 +45,7 @@ if __name__ == "__main__":
     parser.add_argument("--fdm_c2", type=int, default=250, help="c2 of FreeDOM")
     parser.add_argument("--fdm_k", type=int, default=2, help="k of FreeDOM")
     parser.add_argument("--impating_mask_color", type=str, default='gray')
+    parser.add_argument("--rand_impating_proportion", type=float, default=0.25)
 
     # PSLD specific parameters
     parser.add_argument("--psld_gamma", type=float, default=0.1, help="gamma of PSLD")
@@ -65,6 +66,21 @@ if __name__ == "__main__":
     dataset = ImageDataset(root=args.data, transform=test_transforms, return_path=True)
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False)
 
+    if args.impating_mask_color == 'gray':
+        fill_value = (0.0, 0.0, 0.0)
+    elif args.impating_mask_color == 'red':
+        fill_value = (1.0, -1.0, -1.0)
+    elif args.impating_mask_color == 'green':
+        fill_value = (-1.0, 1.0, -1.0)
+    elif args.impating_mask_color == 'blue':
+        fill_value = (-1.0, -1.0, 1.0)
+    elif args.impating_mask_color == 'white':
+        fill_value = (1.0, 1.0, 1.0)
+    elif args.impating_mask_color == 'black':
+        fill_value = (-1.0, -1.0, -1.0)
+    else:
+        raise ValueError('Incorrect color mask')
+
     if args.operator == "srx8":
         f = SuperResolutionOperator([1, 3, 512, 512], 8)
     elif args.operator == "gdb":
@@ -72,20 +88,9 @@ if __name__ == "__main__":
     elif args.operator == "mdb":
         f = MotionBlurOperator()
     elif args.operator == "bip":
-        if args.impating_mask_color == 'gray':
-            fill_value = (0.0, 0.0, 0.0)
-        elif args.impating_mask_color == 'red':
-            fill_value = (1.0, -1.0, -1.0)
-        elif args.impating_mask_color == 'blue':
-            fill_value = (-1.0, 1.0, -1.0)
-        elif args.impating_mask_color == 'green':
-            fill_value = (-1.0, -1.0, 1.0)
-        elif args.impating_mask_color == 'white':
-            fill_value = (1.0, 1.0, 1.0)
-        elif args.impating_mask_color == 'black':
-            fill_value = (-1.0, -1.0, -1.0)
-
-        f = InpaintingOperator(device="cuda")
+        f = InpaintingOperator(device="cuda", fill_value=fill_value)
+    elif args.operator == "rip":
+        f = RandomInpaintingOperator(device="cuda", fill_value=fill_value, proportion=args.rand_impating_proportion)
     else:
         raise NotImplementedError
 
