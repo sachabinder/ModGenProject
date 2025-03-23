@@ -635,7 +635,7 @@ class StableDiffusionInverse(StableDiffusionPipeline):
 
         return latents
 
-    def run_gml_psld(
+    def run_gml_dps(
         self,
         f,
         y,
@@ -924,8 +924,8 @@ class StableDiffusionInverse(StableDiffusionPipeline):
             latent_generation_function = self.run_dsg
         elif algo == "psld":
             latent_generation_function = self.run_psld
-        elif algo == "gml_psld":
-            latent_generation_function = self.run_gml_psld
+        elif algo == "gml_dps":
+            latent_generation_function = self.run_gml_dps
         else:
             raise NotImplementedError
 

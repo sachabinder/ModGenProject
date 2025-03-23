@@ -11,9 +11,9 @@ python main.py \
 
   python main.py \
   --data ./test_image \
-  --out ./paper_experiment/non_linear/mdb/gml_psld \
+  --out ./paper_experiment/non_linear/mdb/gml_dps \
   --scale 4.8 \
-  --algo gml_psld \
+  --algo gml_dps \
   --operator mdb \
   --nstep 500 \
   --model stabilityai/stable-diffusion-2-base \

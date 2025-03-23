@@ -21,9 +21,9 @@ python main.py \
 
 python main.py \
   --data ./test_image \
-  --out ./paper_experiment/pract_theo/gdb/gml_psld \
+  --out ./paper_experiment/pract_theo/gdb/gml_dps \
   --scale 3.5 \
-  --algo gml_psld \
+  --algo gml_dps \
   --operator gdb \
   --nstep 500 \
   --model stabilityai/stable-diffusion-2-base 
@@ -50,9 +50,9 @@ python main.py \
 
 python main.py \
   --data ./test_image \
-  --out ./paper_experiment/pract_theo/srx8/gml_psld \
+  --out ./paper_experiment/pract_theo/srx8/gml_dps \
   --scale 3.5 \
-  --algo gml_psld \
+  --algo gml_dps \
   --operator srx8 \
   --nstep 500 \
   --model stabilityai/stable-diffusion-2-base 
@@ -80,9 +80,9 @@ python main.py \
 
 python main.py \
   --data ./test_image \
-  --out ./paper_experiment/pract_theo/bip/gml_psld \
+  --out ./paper_experiment/pract_theo/bip/gml_dps \
   --scale 3.5 \
-  --algo gml_psld \
+  --algo gml_dps \
   --operator bip \
   --nstep 500 \
   --model stabilityai/stable-diffusion-2-base \
@@ -114,9 +114,9 @@ python main.py \
 
 python main.py \
   --data ./test_image \
-  --out ./paper_experiment/pract_theo/rip/gml_psld \
+  --out ./paper_experiment/pract_theo/rip/gml_dps \
   --scale 3.5 \
-  --algo gml_psld \
+  --algo gml_dps \
   --operator rip \
   --nstep 500 \
   --model stabilityai/stable-diffusion-2-base \
